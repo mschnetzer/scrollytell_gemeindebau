@@ -47,7 +47,7 @@ Vienna is a city of renters with a homeownership rate as low as 20%. Today, roug
 
 \
 
-::: {.column-screen style="background-image:url(kmh-plan.jpg); background-size: 100vw; height: 250px; background-position: center +0%; background-repeat: no-repeat;"}
+::: {.column-screen style="background-image:url(https://mschnetzer.github.io/img/scrollytell/kmh-plan.jpg); background-size: 100vw; height: 250px; background-position: center +0%; background-repeat: no-repeat;"}
 :::
 <figcaption>Plan of [Karl-Marx-Hof](https://en.wikipedia.org/wiki/Karl-Marx-Hof), built between 1927 and 1930 by city planner Karl Ehn. Source: [Vielfalt der Moderne](https://vielfaltdermoderne.de/karl-marx-hof/)</figcaption>
 
