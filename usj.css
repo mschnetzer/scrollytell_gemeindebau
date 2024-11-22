@@ -146,7 +146,7 @@ body, section, header {
 /* mobile sizing (bootstrap: xs) is always overlay-center */
 @media (max-width: 576px) {
   #quarto-document-content h1 {
-    font-size: 2em;
+    font-size: 1.5em;
     line-height: 1;
   }
 
