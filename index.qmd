@@ -1,0 +1,335 @@
+---
+title: "Council housing & neighbourhood income inequality in Vienna"
+author: 
+  - name: Tamara Premrov
+    orcid: 0000-0002-3278-5012
+  - name: Matthias Schnetzer
+    orcid: 0000-0002-1463-1271
+doi: 10.1177/00420980221119408
+title-block-style: default
+lang: en
+bibliography: data/usj.bib
+csl: data/usj.csl
+filters:
+    - openlinksinnewpage
+format: 
+  closeread-html:
+    css: usj.css
+    code-tools: false
+    fig-format: svg
+    toc: false
+    linkcolor: tomato
+---
+
+```{r packages}
+#| echo: false
+#| message: false
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(patchwork)
+
+load("data/gembau.RData") # Subset of Gemeindebau for leaflet
+load("data/gembau_cc.RData") # Centre points of Gemeindebau
+load("data/vienna.RData") # Vienna map with streets and waters
+load("data/rasters.RData") # Rasterdata
+```
+
+# {.page-columns .page-full}
+
+## What is this paper all about?
+
+Vienna features a unique model of council housing that accounts for roughly 25% of all residential dwellings. This paper studies whether the broad provision of council housing is linked with a higher social mix in the neighbourhood. The analysis is based on administrative wage tax data at a small-scale raster grid of 500 $\times$ 500 meter with neighbourhood income inequality as an indicator for the social mix. Spatial econometric models show that council housing is associated with lower average incomes but a slightly higher social mix in the neighbourhood.
+
+## A brief history of council housing in Vienna
+
+Vienna is a city of renters with a homeownership rate as low as 20%. Today, roughly 220,000 dwellings or 25% of all residential dwellings in Vienna are owned by the municipality (*Gemeindebau*), making the city one of the largest real estate owners in Europe [@hatz:2008]. Taking another 15% or almost 150,000 dwellings owned by non-profit housing associations (*Gemeinnützige Bauvereinigungen*) into account, the share of social housing rises to 40%.
+
+\
+
+::: {.column-screen style="background-image:url(data/kmh-plan.jpg); background-size: 100vw; height: 250px; background-position: center +0%; background-repeat: no-repeat;"}
+:::
+<figcaption>Plan of [Karl-Marx-Hof](https://en.wikipedia.org/wiki/Karl-Marx-Hof), built between 1927 and 1930 by city planner Karl Ehn. Source: [Vielfalt der Moderne](https://vielfaltdermoderne.de/karl-marx-hof/)</figcaption>
+
+\
+
+The rapid expansion of social housing in Vienna began after World War I with the electoral victory of the Social Democratic Workers' Party in 1919. As the city became an autonomous province in 1922, it obtained
+the privilege to introduce local taxes that helped finance the political agenda later known as ['Red Vienna'](https://en.wikipedia.org/wiki/Red_Vienna) [@novy:2011]. At the core was a progressive tax on private housing construction (*Wohnbausteuer*) which financed the extensive public housing programme. During the period of Red Vienna, more than 60,000 municipal flats were built together with additional 10,000 flats constructed by non-profit housing associations. Social housing popped up across the city and was not limited to specific low-income neighbourhoods. The era of Red Vienna ended with the political rise of fascism in 1934, but the construction of social housing accelerated after World War II and its provision remained a key element of Viennese welfare policies [@kadi:2015].
+
+:::{.cr-section layout="sidebar-left"}
+
+:::{#cr-gembau}
+```{r gembau}
+#| output: 'asis'
+#| fig-asp: 1.2
+#| warning: false
+fullplot <- 
+ggplot() +
+  geom_sf(data = districtmap, fill = NA, linewidth = 0.1, color = "gray70") +
+  geom_sf(data = watermap, fill = "#9ecae1", alpha = 0.5, color = NA) +
+  geom_sf(data = districtmap |> st_union(), fill = NA, linewidth = 0.2, color = "gray20") +
+  theme_void(base_family = "Barlow Condensed", base_size = 10)
+
+fullplot +
+  geom_sf(data = gembau_cc, size = 1, color = "firebrick")
+```
+:::
+
+:::{#cr-vienna}
+```{r vienna}
+#| output: 'asis'
+#| fig-asp: 1.2
+#| warning: false
+fullplot +
+  geom_sf(data = streets) +
+  geom_curve(aes(x = 4787961, xend = 4791541, y = 2808767, yend = 2808378), curvature = 0, linewidth=0.4, color = "firebrick", arrow=arrow(length=unit(0.01, "npc"), type="closed")) +
+  annotate("label", x= 4785961, y = 2808767, label = "Beltway road", size = 6, family = "Barlow Condensed", fill="firebrick", color = "white") +
+  geom_curve(aes(x = 4800000, xend = 4794618, y = 2804167, yend = 2808200), curvature = 0.1, linewidth=0.4, color = "firebrick", arrow=arrow(length=unit(0.01, "npc"), type="closed")) +
+  annotate("label", x = 4800000, y = 2804167, label = "Ring road", size = 6, family = "Barlow Condensed", fill="firebrick", color = "white") +
+  geom_curve(aes(x = 4797961, xend = 4796600, y = 2815867, yend = 2810900), curvature = -0.1, linewidth=0.4, color = "firebrick", arrow=arrow(length=unit(0.01, "npc"), type="closed")) +
+  annotate("label", x = 4797961, y = 2815867, label = "Danube", size = 6, family = "Barlow Condensed", fill="firebrick", color = "white") +
+  annotate("text", x = 4785961, y = 2818867, label = "VIENNA", size = 10, family = "Barlow Condensed", color = "firebrick")
+```
+:::
+
+:::{#cr-gembau-old}
+```{r gembau-old}
+#| output: 'asis'
+#| fig-asp: 1.2
+#| warning: false
+fullplot +
+  geom_sf(data = gembau_cc |> filter(yearcat == "before 1945"), size = 1, color = "darkorchid")
+```
+:::
+
+:::{#cr-gembau-mid}
+```{r gembau-mid}
+#| output: 'asis'
+#| fig-asp: 1.2
+#| warning: false
+fullplot +
+  geom_sf(data = gembau_cc  |> filter(yearcat == "before 1945"), size = 1, color = "grey90") +
+  geom_sf(data = gembau_cc  |> filter(yearcat == "1945-1980"), size = 1, color = "seagreen4")
+```
+:::
+
+:::{#cr-gembau-new}
+```{r gembau-new}
+#| output: 'asis'
+#| fig-asp: 1.2
+#| warning: false
+fullplot +
+  geom_sf(data = gembau_cc |> filter(!yearcat == "after 1980"), size = 1, color = "grey90") +
+  geom_sf(data = gembau_cc |> filter(yearcat == "after 1980"), size = 1, color = "deeppink")
+```
+:::
+
+@cr-vienna
+
+The era of 'Red Vienna' in the 1920s was the starting point of the success story of council housing. 28% of today's council housing stock was built before 1945. There are rather small units in more central neighbourhoods, while larger complexes are found in the outer districts. @cr-gembau-old
+
+Roughly 55% of today's council housing blocks (representing 61% of flats) have been built in the period between 1945 and 1980. In contrast to other European cities, public housing in Vienna has not been limited to working-class districts but spreads across the city, also in better-off areas. @cr-gembau-mid
+
+In the 1980s and 1990s, the housing market was characterised by liberalisation and deregulation of housing policies such as more flexible rent-setting rules. Between 1980 and 2001 non-profit associations built
+69% of all social housing units while the city contributed 31%. @cr-gembau-new
+
+The construction of council housing spanning over a century has resulted in a broad provision of social housing across all 23 districts in Vienna. Today, the *Gemeindebau* undeniably shapes the urban image of Austria's capital. @cr-gembau
+
+@cr-gembau
+
+:::
+
+The access to council housing is regulated by a number of eligibility criteria. Applicants for a municipal flat must have registered their main residence in the city for at least two years and fulfil one of seven needs-based eligibility criteria. These include the overcrowding of the current habitation, single parenthood, the need for moving due to old age, illness or disability, and moving out from parents for young adults under 30 years of age. Finally, there are income thresholds related to household size; however, these are very generous as the current income threshold for a single person is more than twice the average net income in Vienna.
+
+\
+
+```{r city}
+leaflet(gembau_sub,
+        options = leafletOptions(maxZoom = 18, minZoom = 15,
+                                   keyboard = FALSE, attributionControl = FALSE)) |> 
+  setView(lat = 48.182541, lng = 16.346154, 15) |>
+  setMaxBounds( lng1 = 16.326842, lat1 = 48.191068, lng2 = 16.373534, lat2 = 48.174185)  |> 
+  addTiles(urlTemplate = "https://tiles.stadiamaps.com/tiles/{variant}/{z}/{x}/{y}{r}.png?api_key={apikey}",
+          options = tileOptions(variant='stamen_toner_background', 
+                                apikey = '23928e9f-9547-42cf-8a09-6631343b8325')) |>
+  addPolygons(fillColor = "firebrick", stroke = F, fillOpacity = 1,
+              label = ~lapply(glue::glue("<span style='color:firebrick;font-size:120%;'>{toupper(name)}</span><br>Year of construction: {year}<br>Number of flats: {flats}"), htmltools::HTML), 
+                labelOptions = labelOptions(noHide = F, className = "lflabel"))
+```
+<figcaption>High density of council housing at the border between the 5th and 12th district of Vienna, commonly known as *Ringstraße des Proletariats*.</figcaption>
+
+\
+
+## What is the empirical approach in this paper?
+
+Our analysis is based on the Austrian wage tax statistics for 2017. We use a novel and unique data set providing average annual gross earnings and inequality measures on a 500 $\times$ 500 meter raster grid for Vienna. It includes 716,638 employees and pensioners except for apprentices and individuals earning less than 70% of the minimum earnings threshold for social security. Our data set contains average annual gross earnings, the Gini coefficient measuring inequality in gross earnings between 0 (perfect equality)
+and 1 (maximum inequality), and a set of labour market indicators for each of 1,116 raster cells.
+
+The council housing variable is based on a map of all municipal residential blocks and their number of flats provided by the city of Vienna. We allocate each building to a raster cell and obtain an indicator variable for the presence of council housing which is true for roughly 44% of all raster cells. For robustness checks, we construct two alternative measures for council housing density at the raster and at
+the sub-district level.
+
+Our data gives some indication for spatial autocorrelation that might render ordinary least squares (OLS) estimates inefficient or biased. There are distinct spatial patterns of income and inequality. With respect to income, the city centre as well as the western outskirts belong to the more affluent parts of the city while the beltway area shows low average incomes. The spatial patterns of the Gini coefficient are similar to income; however, we do not find a distinct cluster of low values in the beltway area.
+
+```{r raster}
+#| column: screen
+#| output: 'asis'
+#| out.width: '100%'
+#| fig-asp: 0.5
+#| warning: false
+leftp <- 
+fullplot +
+geom_sf(data = rasters, aes(fill = as.factor(y_mean_quintile)), color = "white", size = 0.05) +
+scale_fill_manual(values = futurevisions::futurevisions("cancri"),
+                  na.translate = F, name = "Quintiles", labels=c("Bottom 20%","","","","Top 20%")) +
+labs(title = "Mean income") +
+theme(plot.title = element_text(size = 10, hjust  = 0.5))
+
+rightp <- 
+fullplot +
+geom_sf(data = rasters, aes(fill = as.factor(gini_quintile)), color = "white", size = 0.05) +
+scale_fill_manual(values = futurevisions::futurevisions("cancri"),
+                  na.translate = F, name = "Quintiles", labels=c("Bottom 20%","","","","Top 20%")) +
+labs(title = "Gini coefficient") +
+theme(plot.title = element_text(size = 10, hjust = 0.5))
+
+leftp + rightp + plot_layout(guides = "collect") & 
+guides(fill = guide_legend(direction="horizontal", title.position = "top", title.hjust = 0.5,
+                               label.position = "bottom", keyheight = unit(0.5, unit="lines"), keywidth = unit(3, unit = "lines"))) & 
+theme(legend.position = 'bottom', legend.key.spacing = unit(0, "pt"))
+```
+
+\
+
+To assess whether there is spatial dependence in an OLS specification with income and inequality as dependent variables, we employ robust Lagrange multiplier tests [@anselin:1996]. The tests suggest a spatial
+autoregressive (SAR) model, that includes a spatial lag of the dependent variable, for the Gini coefficient and a spatial error model (SEM), that controls for spatial dependence in the residuals, for income. The models can be written as
+
+$$y_i = \rho W_{ij}y_j + X_{ij} \beta + u_i $$
+$$ u_i = \lambda W_{ij} u_i + \varepsilon_i$$
+
+where $y_i$ is the dependent variable, $X_{ij}$ the matrix of explanatory variables, $\rho$ the spatial lag parameter, $W_{ij}$ the n $\times$ n spatial weight matrix, $u_i$ the spatially correlated error term and $\lambda$ the spatial error parameter with $\varepsilon \sim N(0, \sigma^2)$. Both $\rho$ and $\lambda$ indicate the extent of spatial dependence. When evaluating a SAR model, $\lambda$ is set to $0$ and in the case of an SEM model, $\rho$ is set to $0$.
+
+## What are the main results of the paper?
+
+First, we show descriptive evidence for the dispersion of mean income and the Gini coefficient across raster cells with and without council housing. There are 488 raster cells with and 634 cells without council housing in our dataset. 
+
+:::{.cr-section layout="sidebar-left"}
+
+:::{#cr-desc-inc}
+```{r desc-inc}
+#| output: 'asis'
+#| fig-asp: 1.2
+#| warning: false
+rasters <- rasters  |> 
+  mutate(gembaudummy = ifelse(gembaudummy == 0, "No council housing (N=634)", "Council housing (N=488)"))
+
+rasters |> 
+  ggplot(aes(x = y_mean, fill = factor(gembaudummy))) +
+  geom_density(data = rasters |> filter(y_mean < 200000)) +
+  geom_vline(aes(xintercept = income_median), color = "white", linewidth = 0.6,
+  data = rasters |> st_drop_geometry() |> summarise(income_median = median(y_mean), .by = gembaudummy)) +
+  geom_text(aes(x = income_median, y = 0, label = paste0("~",format(round(income_median, -2), big.mark = " "),"€")), hjust = -0.1, vjust = -0.3, size = 6, color = "white", family = "Barlow Condensed",
+  data = rasters |> st_drop_geometry() |> summarise(income_median = median(y_mean), .by = gembaudummy)) +
+  scale_fill_manual(values = c("royalblue4", "coral4")) +
+  scale_x_continuous(limits = c(0,150000), 
+                     labels = scales::number_format(prefix = "€")) +
+  facet_wrap(~gembaudummy, nrow = 2) + 
+  labs(x="Average income in raster cell", y = NULL) +
+  theme_minimal(base_family = "Barlow Condensed", base_size = 20) +
+  theme(legend.position = "none",
+  strip.text = element_text(size = 20, hjust = 0),
+  panel.grid.major.y = element_blank(),
+  panel.grid.major.x = element_line(linewidth = 0.3),
+  panel.grid.minor = element_blank(),
+  axis.title.x = element_text(margin = margin(t = 1, unit = "lines")),
+  axis.text.y = element_blank())
+```
+:::
+
+:::{#cr-desc-gini}
+```{r desc-gini}
+#| output: 'asis'
+#| fig-asp: 1.2
+#| warning: false
+rasters |>   
+  ggplot(aes(x = gini, fill = factor(gembaudummy))) +
+  geom_density() +
+  geom_vline(aes(xintercept = gini_median), color = "white", linewidth = 0.6,
+  data = rasters |> st_drop_geometry() |> summarise(gini_median = median(gini), .by = gembaudummy)) +
+  geom_text(aes(x = gini_median, y = 0, label = paste0("~",round(gini_median, 2))), hjust = -0.1, vjust = -0.3, size = 6, color = "white", family = "Barlow Condensed",
+  data = rasters |> st_drop_geometry() |> summarise(gini_median = median(gini), .by = gembaudummy)) +
+  scale_fill_manual(values = c("royalblue4", "coral4")) +
+  scale_x_continuous(limits = c(0.15,NA)) +
+  facet_wrap(~gembaudummy, nrow = 2) + 
+  labs(x="Gini coefficient in raster cell", y = NULL) +
+  theme_minimal(base_family = "Barlow Condensed", base_size = 20) +
+  theme(legend.position = "none", 
+  strip.text = element_text(size = 20, hjust = 0),
+  panel.grid.major.y = element_blank(),
+  panel.grid.major.x = element_line(linewidth = 0.3),
+  panel.grid.minor = element_blank(),
+  axis.title.x = element_text(margin = margin(t = 1, unit = "lines")),
+  axis.text.y = element_blank())
+```
+:::
+
+While the figure shows that the mean income in neighbourhoods with council housing is considerably lower with 37,000 versus 45,500 Euro... @cr-desc-inc
+
+...the Gini coefficient is very similar for rasters with (0.38) and without (0.37) council housing. This indicates income heterogeneity in neighbourhoods with council housing rather than residential segregation. @cr-desc-gini
+
+@cr-desc-gini
+
+:::
+
+Next, we study the relationship between income, inequality and council housing in a multivariate analysis on the raster level. We control for population density, part-time employment, and share of immigrants at the raster level. Like the descriptive analysis, the regression results suggest that the presence of council housing is negatively associated with average income. The negative link might indicate that decision makers accurately targeted low-income areas for the construction of council housing in the past, or that individuals with lower incomes have moved to areas where council housing is provided.
+
+With regard to neighbourhood inequality, we find a weak but positive relationship between the Gini coefficient and the presence of council housing. These results cautiously suggest that neighbourhoods with council housing are less homogeneous in terms of income than other areas in the city and feature a stronger social mix. There is thus evidence that council housing is not associated with polarisation or ghettoisation in Vienna but, if anything, correlates with a higher social mix in the neighbourhood.
+
+In our paper, we check the robustness of the results with (1) different spatial weights matrices, (2) council housing density in a cell rather than a dummy variable, (3) separate analyses by the construction periods of council housing, (4) the exlusion of outliers, and (5) alternative measures for neighbourhood inequality (P80/20 ratio, mean/median ratio).
+
+:::{.tbl-classic}
+|   | OLS<br>Income | SEM<br>Income | OLS<br>Gini coef. | SAR<br>Gini coef. |
+|---|:------:|:-----:|:------:|:------------:|
+| Income | | | 0.25*** (0.01) | 0.21*** (0.01) |
+| Council housing | -0.04* (0.02) | -0.08*** (0.01) | 0.02*** (0.00) | 0.01*** (0.00) |
+| $\lambda$ |  | 0.76*** (0.02) |  |  |
+| $\rho$ |  |  |  | 0.21*** (0.03) |
+| Controls | &#10004; | &#10004; | &#10004; | &#10004; |
+| Observations | 1116 | 1116 | 1116 | 1116 |
+| Adj. R$^2$ | 0.37 | | 0.72 | |
+: Regression outputs {tbl-colwidths="[16,21,21,21,21]"}
+:::
+
+:::{.tbl-note}
+Standard errors in parentheses.<br>*** p < 0.001, ** p < 0.01, * p < 0.05
+:::
+
+\ 
+
+What could be the reasons for the positive relationship between council housing and the social mix in Vienna? First, there is weak residential mobility due to specific legal arrangements such as the right to pass on municipal flats to near relatives under certain conditions. While an income threshold limits access to council housing, residents may keep their flats even if their income later rises beyond that limit. Second, the city abstains from typical surcharges (e.g. location premium), down-payments and fixed-term rental contracts for council housing and thus rents are less dynamic than in the private market. Third, the provision of housing benefits to income-poor households has slowed down processes of replacement and gentrification in more attractive areas. Fourth, unlike in many other European cities, it has been a political strategy to provide council housing in better-off areas also, not only in working-class districts. Fifth, despite tendencies of recommodification of the housing market since the 1980s, the city's housing policy has remained fairly resilient toward these developments.
+
+## What are the main conclusions from this paper?
+
+This paper suggests that council housing in Vienna is linked to lower average incomes and slightly higher within-neighbourhood inequality. We interpret these results cautiously as a positive association between council housing and the social mix. This finding differs from the pattern of many other cities, where social housing is associated with stronger polarisation [@skifter:2015]. Marginalisation and residualisation
+trends do exist but are much weaker than in other cities, including those with a historically similar social housing tradition like Stockholm and Amsterdam [@andersson:2014; @musterd:2014].
+
+Yet, the Vienna housing model is not unchallenged. Despite its resilient tradition dating back a hundred years, the regulatory framework of the housing market has changed in recent decades [@kadi:2015]. There are tendencies towards deregulation of the private rental market and recommodification. Policy measures should thus focus on preserving the social mix in neighbourhoods. In line with @oecd:2018, Well-developed public infrastructure, like schools, parks and public transport, might improve the social mix as individuals with different socio-economic backgrounds living next door are enabled to interact. Many council housing complexes in Vienna come with social, cultural and recreational infrastructure, like kindergarten, schools, theatres, shops, parks, etc, which are important spaces for encounters and interaction in the neighbourhood. Such everyday encounters in public spaces may eventually enhance social cohesion [@piekut:2017].
+
+\
+
+#### References
+
+::: {#refs style="font-size:1rem;"}
+:::
+
+\
+
+# {#info} 
+This document was created with [Quarto](https://quarto.org), [closeread](https://closeread.netlify.app) and [R](https://www.r-project.org). 
+
+\
+
+The webpage is based on an article written by Tamara Premrov and Matthias Schnetzer that has been published in [Urban Studies](https://doi.org/10.1177/00420980221119408).
+
+\
+
+{{< fa envelope >}} [matthias.schnetzer@akwien.at](mailto:matthias.schnetzer (at) akwien.at) &emsp; {{< fa globe >}} [mschnetzer.github.io](https://mschnetzer.github.io/) &emsp; {{< fa brands twitter >}} [matschnetzer](https://x.com/matschnetzer)
